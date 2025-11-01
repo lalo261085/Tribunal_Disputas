@@ -1,48 +1,51 @@
-# Tribunal (refactor)
+# Tribunal (backend de disputas)
 
-Proyecto reorganizado del sistema Tribunal, con responsabilidades separadas en modulos reutilizables y pruebas automatizadas.
+Repositorio centralizado para registrar disputas, administrar votaciones y moderar comentarios sin depender de IPFS ni procesos peer-to-peer. Incluye una interfaz web minima y un API JSON para integraciones externas.
 
-## Cambios clave
+## Componentes principales
 
-- Paquete `tribunal/` con factoria de aplicacion, rutas, persistencia y Socket.IO.
-- Servicio de datos (`DataRepository`) que abstrae IPFS y ofrece respaldo local opcional.
-- Plantillas y estilos renovados en `templates/` y `static/`.
-- Lanzador de escritorio (`tribunal/desktop.py`) equivalente al script original de PyQt5.
-- Dependencias documentadas y pruebas `pytest` que cubren registro, login, ciclo de conflictos y moderacion.
+- `tribunal/data_store.py`: persiste toda la informacion en un fichero JSON (`var/disputes.json`) con bloqueo en memoria.
+- `tribunal/routes.py`: vistas HTML para registro, login, alta de disputas, votacion y debate.
+- `tribunal/api.py`: endpoints REST (`/api`) para crear disputas, emitir votos y anadir comentarios.
+- Suite de pruebas `pytest` que valida los flujos principales (UI y API).
 
 ## Requisitos
 
 - Python 3.11+
-- Dependencias de `requirements.txt`
-- Daemon de IPFS disponible (opcional si se trabaja solo con respaldo local)
+- Dependencias declaradas en `requirements.txt` (`pip install -r requirements.txt`).
 
-## Variables de entorno relevantes
+## Variables de entorno
 
 | Nombre | Valor por defecto | Descripcion |
 | --- | --- | --- |
-| `TRIBUNAL_SECRET_KEY` | `change-me` | Clave de sesion Flask |
-| `TRIBUNAL_FLASK_HOST` / `TRIBUNAL_FLASK_PORT` | `127.0.0.1` / `5002` | Host y puerto del servidor |
-| `TRIBUNAL_IPFS_ENABLED` | `1` | Habilita el uso de IPFS |
-| `TRIBUNAL_IPFS_AUTOSTART` | `1` | Arranca el daemon de IPFS si no esta corriendo |
-| `TRIBUNAL_PUBSUB_TOPIC` | `conflictos-app` | Tema PubSub para notificaciones |
-| `TRIBUNAL_FORBIDDEN_WORDS` | `insulto1,insulto2` | Palabras prohibidas separadas por comas |
-
-Los artefactos de estado (`current_cid.txt`, respaldo local) se generan en `Tribunal/var/` por defecto.
+| `TRIBUNAL_SECRET_KEY` | `change-me` | Clave de sesion para Flask |
+| `TRIBUNAL_FLASK_HOST` | `127.0.0.1` | Host donde corre el servidor |
+| `TRIBUNAL_FLASK_PORT` | `5002` | Puerto de escucha |
+| `TRIBUNAL_DATA_DIR` | `Tribunal/var` | Carpeta donde se almacena `disputes.json` |
+| `TRIBUNAL_DATA_FILE` | `disputes.json` | Nombre del fichero de datos |
+| `TRIBUNAL_FORBIDDEN_WORDS` | `insulto1,insulto2` | Palabras vetadas en comentarios |
+| `VOTING_WINDOW_HOURS` | `24` | Duracion (horas) de la etapa de votacion |
 
 ## Uso
 
-### Servidor web
+### Servidor
 
 ```bash
 pip install -r requirements.txt
 python run.py
 ```
 
-### Aplicacion de escritorio (PyQt5)
+La UI se sirve en `http://localhost:5002/` y el API en `http://localhost:5002/api/`.
 
-```bash
-python -m tribunal.desktop
-```
+### Endpoints API destacados
+
+| Metodo | Ruta | Descripcion |
+| --- | --- | --- |
+| `POST` | `/api/disputes` | Crea una disputa (`creator`, `descripcion`, `descripcion_parte_a`, `descripcion_parte_b`) |
+| `GET` | `/api/disputes` | Lista disputas con votos y comentarios |
+| `GET` | `/api/disputes/<id>` | Obtiene detalle de una disputa |
+| `POST` | `/api/disputes/<id>/vote` | Registra un voto (`usuario`, `voto` = `A` o `B`) |
+| `POST` | `/api/disputes/<id>/comments` | Agrega comentario durante la fase de debate |
 
 ### Pruebas
 
@@ -58,15 +61,14 @@ Tribunal/
 |- requirements.txt
 |- tribunal/
 |  |- __init__.py
+|  |- api.py
 |  |- auth.py
 |  |- config.py
 |  |- data_store.py
-|  |- desktop.py
-|  |- ipfs_service.py
 |  |- routes.py
-|  \- sockets.py
 |- templates/
 |- static/
-|- hooks/
-\- tests/
+|- tests/
+|- var/
+   \- .gitkeep
 ```

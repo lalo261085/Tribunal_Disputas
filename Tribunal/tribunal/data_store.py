@@ -1,4 +1,4 @@
-"""Data persistence helpers with IPFS integration and local fallback."""
+"""Data persistence helpers backed by JSON storage."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import threading
 from typing import Any, Dict, Optional
 
 from .config import Settings
-from .ipfs_service import IPFSService, IPFSUnavailable
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,52 +26,23 @@ DEFAULT_DATA: Dict[str, Any] = {
 class DataRepository:
     """Centralised access to application data."""
 
-    def __init__(self, settings: Settings, ipfs_service: Optional[IPFSService] = None) -> None:
+    def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._ipfs = ipfs_service or IPFSService(settings)
         self._lock = threading.RLock()
+        self._ensure_storage_exists()
 
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
     def load_data(self) -> Dict[str, Any]:
         with self._lock:
-            payload = self._load_from_ipfs() or self._load_from_local()
+            payload = self._load_from_disk()
             return self._ensure_schema(payload)
 
-    def save_data(self, data: Dict[str, Any]) -> Optional[str]:
-        """Persist the payload and return the resulting CID (if IPFS is enabled)."""
-
+    def save_data(self, data: Dict[str, Any]) -> None:
         with self._lock:
             materialised = self._ensure_schema(data)
-            cid: Optional[str] = None
-            if self._ipfs.enabled:
-                try:
-                    cid = self._ipfs.add_json(materialised)
-                    self._write_current_cid(cid)
-                    self._ipfs.publish(self._settings.pubsub_topic, cid)
-                except IPFSUnavailable as exc:
-                    LOGGER.warning("IPFS unavailable, falling back to local storage: %s", exc)
-                except Exception as exc:  # pragma: no cover - network dependant
-                    LOGGER.warning("Unable to persist data to IPFS: %s", exc)
-            self._write_local_backup(materialised)
-            return cid
-
-    def start_pubsub_listener(self, on_new_cid) -> Optional[threading.Thread]:
-        if not (self._ipfs.enabled and self._settings.enable_pubsub_listener):
-            return None
-
-        def _handle(cid: str) -> None:
-            LOGGER.info("Received CID update from pubsub: %s", cid)
-            with self._lock:
-                self._write_current_cid(cid)
-            on_new_cid(cid)
-
-        try:
-            return self._ipfs.subscribe(self._settings.pubsub_topic, _handle)
-        except IPFSUnavailable as exc:
-            LOGGER.warning("Unable to start pubsub listener: %s", exc)
-            return None
+            self._write_to_disk(materialised)
 
     # ------------------------------------------------------------------
     # Conflict phase helpers
@@ -109,55 +79,30 @@ class DataRepository:
     # ------------------------------------------------------------------
     # Internal persistence helpers
     # ------------------------------------------------------------------
-    def _load_from_ipfs(self) -> Optional[Dict[str, Any]]:
-        if not self._ipfs.enabled:
-            return None
-        cid = self._read_current_cid()
-        if not cid:
-            return None
-        try:
-            payload = self._ipfs.cat(cid)
-            if isinstance(payload, bytes):
-                payload = payload.decode("utf-8")
-            return json.loads(payload)
-        except IPFSUnavailable:
-            return None
-        except Exception as exc:  # pragma: no cover - network dependant
-            LOGGER.warning("Failed to load data from IPFS (cid=%s): %s", cid, exc)
-            return None
+    def _ensure_storage_exists(self) -> None:
+        if not self._settings.data_path.exists():
+            self._write_to_disk(deepcopy(DEFAULT_DATA))
 
-    def _load_from_local(self) -> Dict[str, Any]:
-        backup = self._settings.local_backup_path
-        if backup.exists():
-            try:
-                return json.loads(backup.read_text(encoding="utf-8"))
-            except Exception as exc:  # pragma: no cover - corrupted file
-                LOGGER.warning("Invalid local backup, recreating: %s", exc)
-        return deepcopy(DEFAULT_DATA)
-
-    def _write_local_backup(self, data: Dict[str, Any]) -> None:
+    def _load_from_disk(self) -> Dict[str, Any]:
         try:
-            self._settings.local_backup_path.write_text(
+            return json.loads(self._settings.data_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            LOGGER.info("Storage file not found, rebuilding from defaults")
+            self._write_to_disk(deepcopy(DEFAULT_DATA))
+            return deepcopy(DEFAULT_DATA)
+        except json.JSONDecodeError as exc:
+            LOGGER.warning("Corrupt data file detected, resetting storage: %s", exc)
+            self._write_to_disk(deepcopy(DEFAULT_DATA))
+            return deepcopy(DEFAULT_DATA)
+
+    def _write_to_disk(self, data: Dict[str, Any]) -> None:
+        try:
+            self._settings.data_path.write_text(
                 json.dumps(data, indent=2, sort_keys=True),
                 encoding="utf-8",
             )
         except Exception as exc:  # pragma: no cover - IO failure
-            LOGGER.error("Unable to write local backup: %s", exc)
-
-    def _read_current_cid(self) -> Optional[str]:
-        path = self._settings.current_cid_path
-        if path.exists():
-            try:
-                return path.read_text(encoding="utf-8").strip() or None
-            except Exception as exc:  # pragma: no cover
-                LOGGER.warning("Unable to read CID file: %s", exc)
-        return None
-
-    def _write_current_cid(self, cid: str) -> None:
-        try:
-            self._settings.current_cid_path.write_text(cid, encoding="utf-8")
-        except Exception as exc:  # pragma: no cover
-            LOGGER.error("Unable to persist current CID: %s", exc)
+            LOGGER.error("Unable to write data file: %s", exc)
 
     @staticmethod
     def _ensure_schema(data: Dict[str, Any]) -> Dict[str, Any]:

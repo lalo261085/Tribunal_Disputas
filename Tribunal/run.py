@@ -9,15 +9,9 @@ from tribunal import Settings, create_application
 
 def main() -> None:
     settings = Settings()
-    app, socketio = create_application(settings)
+    app = create_application(settings)
     logging.basicConfig(level=logging.INFO)
-    socketio.run(
-        app,
-        host=settings.flask_host,
-        port=settings.flask_port,
-        debug=False,
-        use_reloader=False,
-    )
+    app.run(host=settings.flask_host, port=settings.flask_port, debug=False)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry

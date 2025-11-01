@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-import logging
 
 from flask import Flask
 
 from .config import Settings
 from .data_store import DataRepository
-from .routes import bp as web_blueprint
-from .sockets import init_socketio, socketio
+from .routes import web_bp
+from .api import api_bp
 
 
-LOGGER = logging.getLogger(__name__)
 PACKAGE_ROOT = Path(__file__).resolve().parent
 
 
-def create_application(settings: Settings | None = None):
-    """Create and configure the Flask/Socket.IO application."""
+def create_application(settings: Settings | None = None) -> Flask:
+    """Create and configure the Flask application."""
 
     settings = settings or Settings()
     templates_dir = PACKAGE_ROOT.parent / "templates"
@@ -33,24 +31,16 @@ def create_application(settings: Settings | None = None):
         SECRET_KEY=settings.secret_key,
         FORBIDDEN_WORDS=settings.forbidden_words,
     )
+    app.config.setdefault("VOTING_WINDOW_HOURS", 24)
 
     repository = DataRepository(settings)
     app.config["DATA_REPOSITORY"] = repository
+    app.config["SETTINGS"] = settings
 
-    app.register_blueprint(web_blueprint)
+    app.register_blueprint(web_bp)
+    app.register_blueprint(api_bp, url_prefix="/api")
 
-    init_socketio(settings.async_mode, settings.socketio_cors)
-    socketio.init_app(app, async_mode=settings.async_mode, cors_allowed_origins=settings.socketio_cors)
-
-    if settings.enable_pubsub_listener:
-        LOGGER.info("Activando listener de PubSub de IPFS")
-
-        def _on_new_cid(cid: str) -> None:
-            socketio.emit("data_updated", {"cid": cid})
-
-        repository.start_pubsub_listener(_on_new_cid)
-
-    return app, socketio
+    return app
 
 
-__all__ = ["create_application", "Settings", "socketio"]
+__all__ = ["create_application", "Settings"]

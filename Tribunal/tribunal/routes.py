@@ -17,10 +17,9 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .auth import login_required
-from .sockets import socketio
 
 
-bp = Blueprint("web", __name__)
+web_bp = Blueprint("web", __name__)
 
 
 def _data_repo():
@@ -31,26 +30,28 @@ def _forbidden_words() -> tuple[str, ...]:
     return current_app.config.get("FORBIDDEN_WORDS", ("insulto1", "insulto2"))
 
 
-@bp.route("/", methods=["GET", "POST"])
+@web_bp.route("/", methods=["GET", "POST"])
 def index():
-    data = _data_repo().load_data()
+    repo = _data_repo()
+    data = repo.load_data()
     now = datetime.now()
-    _data_repo().advance_conflict_phases(data, now)
+    repo.advance_conflict_phases(data, now)
     return render_template("index.html", conflictos=data["conflictos"], ahora=now, data=data)
 
 
-@bp.route("/registrarse", methods=["GET", "POST"])
+@web_bp.route("/registrarse", methods=["GET", "POST"])
 def registrarse():
     if request.method == "POST":
         nombre = request.form.get("nombre", "").strip()
         password = request.form.get("password", "")
         if not nombre or not password:
-            flash("Nombre y contrase?a son obligatorios.", "error")
+            flash("Nombre y contrasena son obligatorios.", "error")
             return render_template("registrarse.html")
 
-        data = _data_repo().load_data()
+        repo = _data_repo()
+        data = repo.load_data()
         if any(u["nombre"].lower() == nombre.lower() for u in data["usuarios"]):
-            flash("El nombre de usuario ya est? en uso.", "error")
+            flash("El nombre de usuario ya esta en uso.", "error")
             return render_template("registrarse.html")
 
         usuario_id = (data["usuarios"][-1]["id"] + 1) if data["usuarios"] else 1
@@ -59,38 +60,37 @@ def registrarse():
             "nombre": nombre,
             "password": generate_password_hash(password),
         })
-        cid = _data_repo().save_data(data)
-        if cid:
-            socketio.emit("data_updated", {"cid": cid})
-        flash("Usuario registrado con ?xito. Ahora puedes iniciar sesi?n.", "success")
+        repo.save_data(data)
+        flash("Usuario registrado con exito. Ahora puedes iniciar sesion.", "success")
         return redirect(url_for("web.login"))
     return render_template("registrarse.html")
 
 
-@bp.route("/login", methods=["GET", "POST"])
+@web_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         nombre = request.form.get("nombre", "")
         password = request.form.get("password", "")
-        data = _data_repo().load_data()
+        repo = _data_repo()
+        data = repo.load_data()
         user = next((u for u in data["usuarios"] if u["nombre"].lower() == nombre.lower()), None)
-        if user and check_password_hash(user["password"], password):
+        if user and user.get("password") and check_password_hash(user["password"], password):
             session["user_id"] = user["id"]
             session["username"] = user["nombre"]
-            flash("Inicio de sesi?n exitoso.", "success")
+            flash("Inicio de sesion exitoso.", "success")
             return redirect(url_for("web.index"))
-        flash("Nombre de usuario o contrase?a incorrectos.", "error")
+        flash("Nombre de usuario o contrasena incorrectos.", "error")
     return render_template("login.html")
 
 
-@bp.route("/logout")
+@web_bp.route("/logout")
 def logout():
     session.clear()
-    flash("Has cerrado sesi?n.", "success")
+    flash("Has cerrado sesion.", "success")
     return redirect(url_for("web.index"))
 
 
-@bp.route("/agregar_conflicto", methods=["GET", "POST"])
+@web_bp.route("/agregar_conflicto", methods=["GET", "POST"])
 @login_required
 def agregar_conflicto():
     if request.method == "POST":
@@ -99,10 +99,11 @@ def agregar_conflicto():
         desc_b = request.form.get("descripcion_parte_b", "").strip()
 
         if any(len(texto) > 500 for texto in (descripcion, desc_a, desc_b)):
-            flash("Cada descripci?n debe tener menos de 500 caracteres.", "error")
+            flash("Cada descripcion debe tener menos de 500 caracteres.", "error")
             return render_template("agregar_conflicto.html")
 
-        data = _data_repo().load_data()
+        repo = _data_repo()
+        data = repo.load_data()
         nuevo_id = (data["conflictos"][-1]["id"] + 1) if data["conflictos"] else 1
         inicio_votacion = datetime.now()
         conflicto = {
@@ -118,18 +119,17 @@ def agregar_conflicto():
             "fin_votacion": (inicio_votacion + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S"),
         }
         data["conflictos"].append(conflicto)
-        cid = _data_repo().save_data(data)
-        if cid:
-            socketio.emit("data_updated", {"cid": cid})
-        flash("Conflicto agregado. Votaci?n abierta por 24 horas.", "success")
+        repo.save_data(data)
+        flash("Conflicto agregado. Votacion abierta por 24 horas.", "success")
         return redirect(url_for("web.index"))
     return render_template("agregar_conflicto.html")
 
 
-@bp.route("/borrar_conflicto/<int:conflicto_id>", methods=["POST"])
+@web_bp.route("/borrar_conflicto/<int:conflicto_id>", methods=["POST"])
 @login_required
 def borrar_conflicto(conflicto_id: int):
-    data = _data_repo().load_data()
+    repo = _data_repo()
+    data = repo.load_data()
     conflicto = next((c for c in data["conflictos"] if c["id"] == conflicto_id), None)
     if not conflicto:
         flash("El conflicto no existe.", "error")
@@ -139,18 +139,17 @@ def borrar_conflicto(conflicto_id: int):
         data["conflictos"] = [c for c in data["conflictos"] if c["id"] != conflicto_id]
         data["votos"] = [v for v in data["votos"] if v["conflicto_id"] != conflicto_id]
         data["comentarios"].pop(str(conflicto_id), None)
-        cid = _data_repo().save_data(data)
-        if cid:
-            socketio.emit("data_updated", {"cid": cid})
-        flash("Conflicto eliminado con ?xito.", "success")
+        repo.save_data(data)
+        flash("Conflicto eliminado con exito.", "success")
     return redirect(url_for("web.index"))
 
 
-@bp.route("/votar/<int:conflicto_id>", methods=["POST"])
+@web_bp.route("/votar/<int:conflicto_id>", methods=["POST"])
 @login_required
 def votar(conflicto_id: int):
     voto = request.form.get("voto")
-    data = _data_repo().load_data()
+    repo = _data_repo()
+    data = repo.load_data()
     for conflicto in data["conflictos"]:
         if conflicto["id"] == conflicto_id and conflicto["etapa"] == "votacion":
             if any(v["usuario_id"] == session["user_id"] and v["conflicto_id"] == conflicto_id for v in data["votos"]):
@@ -165,23 +164,22 @@ def votar(conflicto_id: int):
                     conflicto["votos_parte_a"] += 1
                 elif voto == "B":
                     conflicto["votos_parte_b"] += 1
-                cid = _data_repo().save_data(data)
-                if cid:
-                    socketio.emit("data_updated", {"cid": cid})
-                flash("Voto registrado con ?xito.", "success")
+                repo.save_data(data)
+                flash("Voto registrado con exito.", "success")
             break
     else:
-        flash("La votaci?n no est? activa para este conflicto.", "error")
+        flash("La votacion no esta activa para este conflicto.", "error")
     return redirect(url_for("web.index"))
 
 
-@bp.route("/debate/<int:conflicto_id>", methods=["GET", "POST"])
+@web_bp.route("/debate/<int:conflicto_id>", methods=["GET", "POST"])
 @login_required
 def debate(conflicto_id: int):
-    data = _data_repo().load_data()
+    repo = _data_repo()
+    data = repo.load_data()
     conflicto = next((c for c in data["conflictos"] if c["id"] == conflicto_id), None)
     if not conflicto or conflicto.get("etapa") != "debate":
-        flash("El debate no est? activo para este conflicto.", "error")
+        flash("El debate no esta activo para este conflicto.", "error")
         return redirect(url_for("web.index"))
 
     votos_a = conflicto.get("votos_parte_a", 0)
@@ -209,10 +207,8 @@ def debate(conflicto_id: int):
                 "usuario": session.get("username"),
                 "texto": comentario,
             })
-            cid = _data_repo().save_data(data)
-            if cid:
-                socketio.emit("data_updated", {"cid": cid})
-            flash("Comentario agregado con ?xito.", "success")
+            repo.save_data(data)
+            flash("Comentario agregado con exito.", "success")
 
     comentarios = data["comentarios"].get(str(conflicto_id), [])
     return render_template(

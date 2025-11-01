@@ -16,7 +16,7 @@ def test_registration_and_login_flow(client, app):
         data={"nombre": "alice", "password": "password123"},
         follow_redirects=True,
     )
-    assert b"Inicio de sesi\xc3\xb3n exitoso" in response.data
+    assert b"Inicio de sesion exitoso" in response.data
 
 
 def test_full_conflict_lifecycle(client, app):

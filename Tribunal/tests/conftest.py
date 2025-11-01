@@ -8,16 +8,14 @@ from tribunal import Settings, create_application
 @pytest.fixture()
 def settings(tmp_path):
     return Settings(
-        ipfs_enabled=False,
-        auto_start_ipfs_daemon=False,
-        enable_pubsub_listener=False,
-        state_dir=tmp_path,
+        data_dir=tmp_path,
+        forbidden_words=("insulto1", "insulto2"),
     )
 
 
 @pytest.fixture()
 def app(settings):
-    app, _ = create_application(settings)
+    app = create_application(settings)
     app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     yield app
 
