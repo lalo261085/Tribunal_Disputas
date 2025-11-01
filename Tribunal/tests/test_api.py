@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from tribunal import Settings, create_application
+
 
 def test_api_dispute_flow(client, app):
     # Create dispute
@@ -51,3 +53,19 @@ def test_api_dispute_flow(client, app):
     assert response.status_code == 200
     payload = response.get_json()
     assert any(d["id"] == conflicto_id for d in payload["disputes"])
+
+
+def test_api_requires_token_when_configured(tmp_path):
+    secure_settings = Settings(
+        data_dir=tmp_path / "secure",
+        api_token="secret",
+        forbidden_words=("insulto1", "insulto2"),
+    )
+    secure_app = create_application(secure_settings)
+    secure_client = secure_app.test_client()
+
+    response = secure_client.get("/api/disputes")
+    assert response.status_code == 401
+
+    response = secure_client.get("/api/disputes", headers={"X-API-Key": "secret"})
+    assert response.status_code == 200

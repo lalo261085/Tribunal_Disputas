@@ -32,6 +32,7 @@ def create_application(settings: Settings | None = None) -> Flask:
         FORBIDDEN_WORDS=settings.forbidden_words,
     )
     app.config.setdefault("VOTING_WINDOW_HOURS", 24)
+    app.config["API_TOKEN"] = settings.api_token
 
     repository = DataRepository(settings)
     app.config["DATA_REPOSITORY"] = repository

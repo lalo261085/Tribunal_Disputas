@@ -27,6 +27,7 @@ class Settings:
         )
     )
     data_filename: str = os.getenv("TRIBUNAL_DATA_FILE", "disputes.json")
+    api_token: str | None = os.getenv("TRIBUNAL_API_TOKEN")
     forbidden_words: tuple[str, ...] = field(
         default_factory=lambda: _split_words(os.getenv("TRIBUNAL_FORBIDDEN_WORDS", "insulto1,insulto2"))
     )
@@ -36,6 +37,9 @@ class Settings:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         if not self.forbidden_words:
             self.forbidden_words = ("insulto1", "insulto2")
+        if self.api_token:
+            token = self.api_token.strip()
+            self.api_token = token or None
 
     @property
     def data_path(self) -> Path:

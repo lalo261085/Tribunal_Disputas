@@ -23,6 +23,7 @@ Repositorio centralizado para registrar disputas, administrar votaciones y moder
 | `TRIBUNAL_FLASK_PORT` | `5002` | Puerto de escucha |
 | `TRIBUNAL_DATA_DIR` | `Tribunal/var` | Carpeta donde se almacena `disputes.json` |
 | `TRIBUNAL_DATA_FILE` | `disputes.json` | Nombre del fichero de datos |
+| `TRIBUNAL_API_TOKEN` | *(vacio)* | Token requerido por el API cuando se establece |
 | `TRIBUNAL_FORBIDDEN_WORDS` | `insulto1,insulto2` | Palabras vetadas en comentarios |
 | `VOTING_WINDOW_HOURS` | `24` | Duracion (horas) de la etapa de votacion |
 
@@ -36,6 +37,8 @@ python run.py
 ```
 
 La UI se sirve en `http://localhost:5002/` y el API en `http://localhost:5002/api/`.
+
+Si `TRIBUNAL_API_TOKEN` esta definido, todas las solicitudes al API deben incluir la cabecera `X-API-Key` con el token (o `Authorization: Bearer <token>`).
 
 ### Endpoints API destacados
 
@@ -52,6 +55,15 @@ La UI se sirve en `http://localhost:5002/` y el API en `http://localhost:5002/ap
 ```bash
 pytest
 ```
+
+### Build para macOS
+
+```bash
+chmod +x scripts/build_mac.sh
+scripts/build_mac.sh
+```
+
+El binario se genera en `dist/TribunalServer` listo para ejecutarse en macOS (requiere Python 3 y PyInstaller en la maquina de build).
 
 ## Estructura
 

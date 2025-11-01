@@ -18,6 +18,17 @@ def _forbidden_words() -> tuple[str, ...]:
     return current_app.config.get("FORBIDDEN_WORDS", ("insulto1", "insulto2"))
 
 
+@api_bp.before_request
+def _require_api_token():
+    token = current_app.config.get("API_TOKEN")
+    if not token:
+        return None
+    provided = request.headers.get("X-API-Key") or request.headers.get("Authorization", "").removeprefix("Bearer ")
+    if provided != token:
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
+
+
 def _ensure_user(data: dict, username: str) -> dict:
     for user in data["usuarios"]:
         if user["nombre"].lower() == username.lower():

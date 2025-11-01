@@ -9,6 +9,7 @@ from tribunal import Settings, create_application
 def settings(tmp_path):
     return Settings(
         data_dir=tmp_path,
+        api_token=None,
         forbidden_words=("insulto1", "insulto2"),
     )
 
