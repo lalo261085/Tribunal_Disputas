@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo conflicto ? Tribunal{% endblock %}
+
+{% block content %}
+  <h2>Registrar conflicto</h2>
+  <form action="{{ url_for('web.agregar_conflicto') }}" method="post" class="formulario">
+    <label for="descripcion">Descripci?n general</label>
+    <textarea id="descripcion" name="descripcion" maxlength="500" required></textarea>
+
+    <label for="descripcion_parte_a">Postura A</label>
+    <textarea id="descripcion_parte_a" name="descripcion_parte_a" maxlength="500" required></textarea>
+
+    <label for="descripcion_parte_b">Postura B</label>
+    <textarea id="descripcion_parte_b" name="descripcion_parte_b" maxlength="500" required></textarea>
+
+    <button type="submit">Guardar</button>
+  </form>
+{% endblock %}

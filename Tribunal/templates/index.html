@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Conflictos ? Tribunal{% endblock %}
+
+{% block content %}
+  <section>
+    <h2>Conflictos activos</h2>
+    {% if conflictos %}
+      {% for conflicto in conflictos %}
+        <article class="conflicto">
+          <header>
+            <h3>Conflicto #{{ conflicto.id }}</h3>
+            <p><strong>Creado por:</strong> Usuario {{ conflicto.usuario_id }}</p>
+            <p><strong>Estado:</strong> {{ conflicto.etapa|capitalize }}</p>
+          </header>
+          <p>{{ conflicto.descripcion }}</p>
+          <div class="detalle">
+            <p><strong>Parte A:</strong> {{ conflicto.descripcion_parte_a }}</p>
+            <p><strong>Parte B:</strong> {{ conflicto.descripcion_parte_b }}</p>
+          </div>
+
+          <div class="resumen-votos">
+            <span>A: {{ conflicto.votos_parte_a }}</span>
+            <span>B: {{ conflicto.votos_parte_b }}</span>
+          </div>
+
+          {% if conflicto.etapa == 'votacion' %}
+            <form action="{{ url_for('web.votar', conflicto_id=conflicto.id) }}" method="post" class="form-voto">
+              <label>Tu voto:</label>
+              <div class="acciones">
+                <button name="voto" value="A" type="submit">Votar por A</button>
+                <button name="voto" value="B" type="submit">Votar por B</button>
+              </div>
+            </form>
+            <p class="fechas">Votaci?n hasta: {{ conflicto.fin_votacion }}</p>
+          {% elif conflicto.etapa == 'debate' %}
+            <p class="fechas">Debate hasta: {{ conflicto.fin_debate }}</p>
+            <a class="boton" href="{{ url_for('web.debate', conflicto_id=conflicto.id) }}">Participar en debate</a>
+          {% elif conflicto.etapa == 'cerrado' %}
+            <p class="fechas">Conflicto cerrado.</p>
+          {% endif %}
+
+          {% if session.get('user_id') == conflicto.usuario_id %}
+            <form action="{{ url_for('web.borrar_conflicto', conflicto_id=conflicto.id) }}" method="post" class="form-inline">
+              <button type="submit" class="danger">Eliminar conflicto</button>
+            </form>
+          {% endif %}
+        </article>
+      {% endfor %}
+    {% else %}
+      <p>No hay conflictos registrados todav?a.</p>
+    {% endif %}
+  </section>
+{% endblock %}

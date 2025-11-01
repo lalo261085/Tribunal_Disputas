@@ -1,0 +1,8 @@
+Flask>=2.3
+Flask-SocketIO>=5.3
+Werkzeug>=2.3
+ipfshttpclient>=0.8
+PyQt5>=5.15
+eventlet>=0.33
+python-dotenv>=1.0
+pytest>=7.4

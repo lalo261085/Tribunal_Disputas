@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar sesi?n ? Tribunal{% endblock %}
+
+{% block content %}
+  <h2>Iniciar sesi?n</h2>
+  <form action="{{ url_for('web.login') }}" method="post" class="formulario">
+    <label for="nombre">Nombre de usuario</label>
+    <input type="text" id="nombre" name="nombre" required>
+
+    <label for="password">Contrase?a</label>
+    <input type="password" id="password" name="password" required>
+
+    <button type="submit">Entrar</button>
+  </form>
+{% endblock %}
